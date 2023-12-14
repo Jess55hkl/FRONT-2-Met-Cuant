@@ -1,19 +1,40 @@
 document.addEventListener('DOMContentLoaded', function () {
     fetch('http://127.0.0.1:8000/api/clientes/')
         .then(response => response.json())
-        .then(data => createTable(data));
+        .then(data => createTables(data));
+
+    // Add event listener to the "Process Client" button
+    const processButton = document.getElementById('processButton');
+    processButton.addEventListener('click', processClient);
 });
 
-function createTable(data) {
+function createTables(data) {
     const clientList = document.getElementById('clientList');
     clientList.innerHTML = ''; // Clear existing content
 
+    const unprocessedClients = data.filter(client => !client.processed);
+    const processedClients = data.filter(client => client.processed);
+
+    const unprocessedTable = createTable(unprocessedClients, true);
+    const processedTable = createTable(processedClients, false);
+
+    clientList.appendChild(unprocessedTable);
+
+    // Add title for processed client list
+    const processedTitle = document.createElement('h2');
+    processedTitle.textContent = 'Processed Client List';
+    clientList.appendChild(processedTitle);
+
+    clientList.appendChild(processedTable);
+}
+
+function createTable(data, isUnprocessed) {
     const table = document.createElement('table');
     table.className = 'table';
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    const headers = ['Name', 'Status', 'Priority'];
+    const headers = ['Name', 'Status', 'Position'];
     headers.forEach(headerText => {
         const th = document.createElement('th');
         th.appendChild(document.createTextNode(headerText));
@@ -23,7 +44,7 @@ function createTable(data) {
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
-    data.sort((a, b) => b.priority - a.priority);
+    data.sort((a, b) => isUnprocessed ? a.pos - b.pos : 0);
     data.forEach(client => {
         const row = document.createElement('tr');
 
@@ -35,22 +56,22 @@ function createTable(data) {
         statusCell.appendChild(document.createTextNode(client.status));
         row.appendChild(statusCell);
 
-        const priorityCell = document.createElement('td');
-        priorityCell.appendChild(document.createTextNode(client.priority));
+        const posCell = document.createElement('td');
+        posCell.appendChild(document.createTextNode(client.pos));
 
         // Create and append the dot svg
-        const dotSvg = createDotSvg(client.priority, !client.processed);
-        priorityCell.appendChild(dotSvg);
+        const dotSvg = createDotSvg(client.pos, isUnprocessed);
+        posCell.appendChild(dotSvg);
 
-        row.appendChild(priorityCell);
+        row.appendChild(posCell);
         tbody.appendChild(row);
     });
 
     table.appendChild(tbody);
-    clientList.appendChild(table);
+    return table;
 }
 
-function createDotSvg(priority, isUnprocessed) {
+function createDotSvg(pos, isUnprocessed) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('height', '16');
     svg.setAttribute('width', '16');
@@ -60,11 +81,11 @@ function createDotSvg(priority, isUnprocessed) {
     circle.setAttribute('cy', '8');
     circle.setAttribute('r', '6');
 
-    // Set the color based on priority
+    // Set the color based on position
     if (isUnprocessed) {
-        if (priority <= 50) {
+        if (pos <= 50) {
             circle.setAttribute('fill', 'green');
-        } else if (priority <= 75) {
+        } else if (pos <= 75) {
             circle.setAttribute('fill', 'yellow');
         } else {
             circle.setAttribute('fill', 'red');
@@ -76,4 +97,19 @@ function createDotSvg(priority, isUnprocessed) {
 
     svg.appendChild(circle);
     return svg;
+}
+
+function processClient() {
+    // Send a POST request to the API to process a client
+    fetch('http://127.0.0.1:8000/api/clientes/queue/', {
+        method: 'GET',
+    })
+        .then(response => response.json())
+        .then(data => {
+            // Display the updated client list after processing
+            fetch('http://127.0.0.1:8000/api/clientes/')
+                .then(response => response.json())
+                .then(data => createTables(data));
+        })
+        .catch(error => console.error('Error processing client:', error));
 }
